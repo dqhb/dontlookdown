@@ -154,7 +154,11 @@
             onGround: false, isDead: false, maxAltitude: 0
         };
 
-        const pMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: 0xfbbf24, roughness: 0.2, metalness: 0.8}));
+        // FIXED: Changed CapsuleGeometry to CylinderGeometry for r128 compatibility
+        const pMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.5, 0.5, 2, 16), 
+            new THREE.MeshStandardMaterial({color: 0xfbbf24, roughness: 0.2, metalness: 0.8})
+        );
         pMesh.castShadow = true;
         scene.add(pMesh);
 
@@ -263,8 +267,8 @@
             pMesh.position.set(player.x, player.y, player.z);
 
             // -- Dynamic Sky & Fog Colors --
-            // As you go higher, sky turns from blue to dark space purple
-            let heightFactor = Math.min(player.y / 200, 1);
+            // FIXED: Math.max added to prevent negative values when falling below 0
+            let heightFactor = Math.max(0, Math.min(player.y / 200, 1));
             let skyColor = new THREE.Color().lerpColors(new THREE.Color(0x87CEEB), new THREE.Color(0x0f0524), heightFactor);
             scene.background = skyColor;
             scene.fog.color = skyColor;
@@ -272,7 +276,7 @@
             // -- Camera Positioning --
             let camDist = 8;
             let cx = player.x + camDist * Math.sin(player.yaw) * Math.cos(player.pitch);
-            let cy = player.y + 1 + camDist * Math.sin(player.pitch);
+            let cy = player.y + 1 + cam Math.sin(player.pitch);
             let cz = player.z + camDist * Math.cos(player.yaw) * Math.cos(player.pitch);
             
             camera.position.set(cx, cy, cz);
