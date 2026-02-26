@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blade & Block</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+        canvas { display: block; }
+
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        #hud { padding: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        
+        #player-stats { background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; border: 2px solid #555; width: 300px; }
+        #health-bg { background: #333; width: 100%; height: 20px; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+        #health-bar { background: #10b981; width: 100%; height: 100%; transition: width 0.2s; }
+        #kills { color: #fbbf24; font-size: 1.5rem; font-weight: bold; margin-bottom: 5px; }
+        #status { color: #38bdf8; font-size: 1.1rem; font-weight: bold; height: 20px; }
+
+        #controls-help { background: rgba(0,0,0,0.6); color: white; padding: 15px; border-radius: 8px; font-size: 0.9rem; line-height: 1.6; }
+        .key { background: #444; padding: 2px 6px; border-radius: 4px; border: 1px solid #777; font-weight: bold; }
+
+        /* Floating Enemy Health Bars container */
+        #floating-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+        .enemy-health-bg { position: absolute; width: 50px; height: 8px; background: #333; border: 1px solid #000; border-radius: 4px; transform: translate(-50%, -50%); display: none; }
+        .enemy-health-fill { width: 100%; height: 100%; background: #ef4444; border-radius: 4px; transition: width 0.1s; }
+
+        #death-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(100, 0, 0, 0.8); display: none; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; }
+        #death-screen h1 { color: white; font-size: 5rem; margin-bottom: 10px; text-transform: uppercase; }
+        #final-score { color: #fbbf24; font-size: 2rem; margin-bottom: 30px; }
+        button { background: white; border: none; padding: 15px 30px; font-size: 1.5rem; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase; transition: 0.2s; }
+        button:hover { background: #fbbf24; transform: scale(1.05); }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="hud">
+            <div id="player-stats">
+                <div id="kills">Enemies Defeated: 0</div>
+                <div id="health-bg"><div id="health-bar"></div></div>
+                <div id="status">Ready</div>
+            </div>
+            <div id="controls-help">
+                Move: <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><br>
+                Camera: <span class="key">Arrows</span><br>
+                Jump: <span class="key">Space</span><br>
+                Attack: <span class="key">Q</span><br>
+                Block: <span class="key">Hold E</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="floating-ui"></div>
+
+    <div id="death-screen">
+        <h1>YOU DIED</h1>
+        <div id="final-score">Enemies Defeated: 0</div>
+        <button onclick="location.reload()">Try Again</button>
+    </div>
+
+    <script>
+        // --- 1. SCENE & CAMERA SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100); // Fog to hide world edges
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50;
+        dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50;
+        scene.add(dirLight);
+
+        // --- 2. WORLD GENERATION ---
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(300, 300);
+        const groundMat = new THREE.MeshPhongMaterial({ color: 0x2d5a27 }); // Dark green
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Generate Scenery (Trees, Hills, Buildings)
+        function createScenery() {
+            // Hills (Green Spheres half buried)
+            const hillMat = new THREE.MeshPhongMaterial({ color: 0x3a7833 });
+            for(let i=0; i<15; i++) {
+                let r = Math.random() * 10 + 5;
+                let hill = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), hillMat);
+                hill.position.set((Math.random()-0.5)*200, -r/2, (Math.random()-0.5)*200);
+                scene.add(hill);
+            }
+
+            // Trees (Cylinder + Cone)
+            const trunkMat = new THREE.MeshPhongMaterial({ color: 0x5c4033 });
+            const leafMat = new THREE.MeshPhongMaterial({ color: 0x1e4d2b });
+            for(let i=0; i<60; i++) {
+                let treeGroup = new THREE.Group();
+                let trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3), trunkMat);
+                trunk.position.y = 1.5; trunk.castShadow = true;
+                let leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 5, 8), leafMat);
+                leaves.position.y = 4.5; leaves.castShadow = true;
+                treeGroup.add(trunk); treeGroup.add(leaves);
+                treeGroup.position.set((Math.random()-0.5)*200, 0, (Math.random()-0.5)*200);
+                scene.add(treeGroup);
+            }
+
+            // Buildings (Boxes)
+            const stoneMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+            for(let i=0; i<10; i++) {
+                let w = Math.random()*8 + 4; let h = Math.random()*15 + 5; let d = Math.random()*8 + 4;
+                let building = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stoneMat);
+                building.position.set((Math.random()-0.5)*200, h/2, (Math.random()-0.5)*200);
+                building.castShadow = true; building.receiveShadow = true;
+                scene.add(building);
+            }
+        }
+        createScenery();
+
+        // --- 3. INPUT HANDLING ---
+        const keys = { w: false, a: false, s: false, d: false, space: false, q: false, e: false, up: false, down: false, left: false, right: false };
+        
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keys.w = true; if (k === 'a') keys.a = true;
+            if (k === 's') keys.s = true; if (k === 'd') keys.d = true;
+            if (k === ' ') { keys.space = true; e.preventDefault(); }
+            if (k === 'q') keys.q = true; if (k === 'e') keys.e = true;
+            if (e.key === 'ArrowUp') { keys.up = true; e.preventDefault(); }
+            if (e.key === 'ArrowDown') { keys.down = true; e.preventDefault(); }
+            if (e.key === 'ArrowLeft') { keys.left = true; e.preventDefault(); }
+            if (e.key === 'ArrowRight') { keys.right = true; e.preventDefault(); }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keys.w = false; if (k === 'a') keys.a = false;
+            if (k === 's') keys.s = false; if (k === 'd') keys.d = false;
+            if (k === ' ') keys.space = false;
+            if (k === 'q') keys.q = false; if (k === 'e') keys.e = false;
+            if (e.key === 'ArrowUp') keys.up = false;
+            if (e.key === 'ArrowDown') keys.down = false;
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowRight') keys.right = false;
+        });
+
+        // --- 4. PLAYER CHARACTER ---
+        const player = {
+            x: 0, y: 0, z: 0, vy: 0, health: 100, kills: 0, isDead: false,
+            yaw: 0, // Camera horizontal rotation
+            pitch: 0.3, // Camera vertical rotation
+            isAttacking: false, attackTimer: 0, isBlocking: false
+        };
+
+        const pGroup = new THREE.Group();
+        const pBody = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({ color: 0x38bdf8 }));
+        pBody.position.y = 1; pBody.castShadow = true;
+        pGroup.add(pBody);
+
+        // Sword
+        const swordGroup = new THREE.Group();
+        swordGroup.position.set(0.6, 1, -0.2); // Attached to right side
+        const swordHilt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4), new THREE.MeshPhongMaterial({color: 0x444444}));
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.5, 0.2), new THREE.MeshPhongMaterial({color: 0xcccccc}));
+        swordBlade.position.y = 0.9;
+        swordGroup.add(swordHilt); swordGroup.add(swordBlade);
+        swordGroup.rotation.x = Math.PI / 4; // Rest position
+        pGroup.add(swordGroup);
+        scene.add(pGroup);
+
+        // --- 5. ENEMY SYSTEM ---
+        let enemies = [];
+        const floatingUI = document.getElementById('floating-ui');
+
+        function spawnEnemy() {
+            if(enemies.length > 15) return; // Cap at 15
+            let ex = player.x + (Math.random() - 0.5) * 60;
+            let ez = player.z + (Math.random() - 0.5) * 60;
+            
+            // Don't spawn too close
+            if (Math.abs(ex - player.x) < 15 && Math.abs(ez - player.z) < 15) return;
+
+            let eGroup = new THREE.Group();
+            let eBody = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({ color: 0xef4444 }));
+            eBody.position.y = 1; eBody.castShadow = true;
+            eGroup.add(eBody);
+            
+            // Enemy Sword
+            let eSword = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 0.2), new THREE.MeshPhongMaterial({color: 0x999999}));
+            eSword.position.set(0.6, 1.5, -0.5);
+            eSword.rotation.x = Math.PI / 2; // Pointing forward
+            eGroup.add(eSword);
+            
+            eGroup.position.set(ex, 0, ez);
+            scene.add(eGroup);
+
+            // Create HTML Health Bar
+            let hpContainer = document.createElement('div');
+            hpContainer.className = 'enemy-health-bg';
+            let hpFill = document.createElement('div');
+            hpFill.className = 'enemy-health-fill';
+            hpContainer.appendChild(hpFill);
+            floatingUI.appendChild(hpContainer);
+
+            enemies.push({
+                mesh: eGroup, health: 50, maxHealth: 50, x: ex, z: ez, 
+                ui: hpContainer, uiFill: hpFill, attackCooldown: 0
+            });
+        }
+
+        setInterval(spawnEnemy, 2000); // Try spawning every 2s
+
+        // --- 6. GAME LOGIC & PHYSICS ---
+        const clock = new THREE.Clock();
+        const statusEl = document.getElementById('status');
+        const healthBarEl = document.getElementById('health-bar');
+        const killsEl = document.getElementById('kills');
+
+        function takeDamage(amount) {
+            if (player.isBlocking) {
+                amount = Math.floor(amount * 0.2); // 80% damage reduction
+                statusEl.innerText = "Blocked!";
+                statusEl.style.color = "#fbbf24";
+            } else {
+                statusEl.innerText = "Hit!";
+                statusEl.style.color = "#ef4444";
+            }
+            player.health -= amount;
+            if (player.health < 0) player.health = 0;
+            healthBarEl.style.width = player.health + "%";
+
+            if (player.health === 0 && !player.isDead) {
+                player.isDead = true;
+                document.getElementById('death-screen').style.display = 'flex';
+                document.getElementById('final-score').innerText = `Enemies Defeated: ${player.kills}`;
+            }
+            setTimeout(() => { if(!player.isBlocking && !player.isDead) statusEl.innerText = "Ready"; }, 1000);
+        }
+
+        function update() {
+            if (player.isDead) return;
+            const dt = Math.min(clock.getDelta(), 0.1);
+
+            // -- Camera Controls (Arrows) --
+            if (keys.left) player.yaw += 2 * dt;
+            if (keys.right) player.yaw -= 2 * dt;
+            if (keys.up) player.pitch -= 1.5 * dt;
+            if (keys.down) player.pitch += 1.5 * dt;
+            // Clamp pitch to avoid flipping
+            player.pitch = Math.max(0.1, Math.min(Math.PI / 2.2, player.pitch));
+
+            // -- Player Movement (WASD relative to Camera Yaw) --
+            let speed = 10;
+            let moveX = 0; let moveZ = 0;
+            
+            if (keys.w) { moveZ -= 1; }
+            if (keys.s) { moveZ += 1; }
+            if (keys.a) { moveX -= 1; }
+            if (keys.d) { moveX += 1; }
+
+            if (moveX !== 0 || moveZ !== 0) {
+                // Normalize for diagonal movement
+                let length = Math.sqrt(moveX*moveX + moveZ*moveZ);
+                moveX /= length; moveZ /= length;
+                
+                // Rotate movement vector by camera yaw
+                let c = Math.cos(player.yaw); let s = Math.sin(player.yaw);
+                let worldX = moveX * c - moveZ * s;
+                let worldZ = moveX * s + moveZ * c;
+
+                player.x += worldX * speed * dt;
+                player.z += worldZ * speed * dt;
+
+                // Face the direction of movement
+                pGroup.rotation.y = Math.atan2(worldX, worldZ);
+            }
+
+            // Boundary limits
+            player.x = Math.max(-145, Math.min(145, player.x));
+            player.z = Math.max(-145, Math.min(145, player.z));
+
+            // Gravity & Jump
+            player.vy -= 25 * dt; // Gravity
+            player.y += player.vy * dt;
+            if (player.y < 0) { player.y = 0; player.vy = 0; }
+            if (keys.space && player.y === 0) { player.vy = 12; }
+
+            pGroup.position.set(player.x, player.y, player.z);
+
+            // -- Combat System --
+            player.isBlocking = keys.e && !player.isAttacking;
+            
+            if (player.isBlocking) {
+                swordGroup.rotation.x = Math.PI / 2; // Hold horizontal across body
+                swordGroup.rotation.z = Math.PI / 2;
+                swordGroup.position.set(0, 1.5, -0.6);
+                statusEl.innerText = "Blocking"; statusEl.style.color = "#fbbf24";
+            } else {
+                swordGroup.position.set(0.6, 1, -0.2);
+                swordGroup.rotation.z = 0;
+                
+                if (keys.q && !player.isAttacking) {
+                    player.isAttacking = true;
+                    player.attackTimer = 0.3; // 0.3 seconds swing
+                    statusEl.innerText = "Swinging!"; statusEl.style.color = "#38bdf8";
+                }
+
+                if (player.isAttacking) {
+                    player.attackTimer -= dt;
+                    // Animate sword swing downward
+                    let swingAnim = player.attackTimer / 0.3; // 1 to 0
+                    swordGroup.rotation.x = (swingAnim * Math.PI) - (Math.PI / 2); // Swing from high to low
+
+                    if (player.attackTimer <= 0) {
+                        player.isAttacking = false;
+                        statusEl.innerText = "Ready";
+                    }
+                } else {
+                    swordGroup.rotation.x = Math.PI / 4; // Rest
+                }
+            }
+
+            // -- Camera Positioning --
+            // Calculate offset based on yaw and pitch
+            let camDist = 12;
+            let cx = player.x + camDist * Math.sin(player.yaw) * Math.cos(player.pitch);
+            let cy = player.y + 2 + camDist * Math.sin(player.pitch); // +2 to look at head height
+            let cz = player.z + camDist * Math.cos(player.yaw) * Math.cos(player.pitch);
+            
+            camera.position.set(cx, cy, cz);
+            camera.lookAt(player.x, player.y + 2, player.z);
+
+            // -- Enemies Logic --
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                let dx = player.x - e.x;
+                let dz = player.z - e.z;
+                let dist = Math.sqrt(dx*dx + dz*dz);
+
+                // Face Player
+                e.mesh.rotation.y = Math.atan2(dx, dz);
+
+                // Move towards player
+                if (dist > 2) {
+                    e.x += (dx/dist) * 3 * dt; // Speed 3
+                    e.z += (dz/dist) * 3 * dt;
+                } else {
+                    // Attack Player
+                    e.attackCooldown -= dt;
+                    if (e.attackCooldown <= 0) {
+                        takeDamage(10);
+                        e.attackCooldown = 1.5; // Attack every 1.5s
+                        
+                        // Simple poke animation
+                        e.mesh.children[1].position.z = -1;
+                        setTimeout(() => { if(e.mesh.children[1]) e.mesh.children[1].position.z = -0.5; }, 200);
+                    }
+                }
+                e.mesh.position.set(e.x, 0, e.z);
+
+                // Player Hit Detection
+                if (player.isAttacking && player.attackTimer > 0.1 && player.attackTimer < 0.2) {
+                    // If enemy is close AND in front of player
+                    if (dist < 3.5) {
+                        // Calculate angle difference between player facing and enemy position
+                        let angleToEnemy = Math.atan2(dx, dz);
+                        let angleDiff = Math.abs(pGroup.rotation.y - angleToEnemy);
+                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                        
+                        if (angleDiff < Math.PI / 3) { // 60 degree cone
+                            e.health -= 20;
+                            e.uiFill.style.width = (e.health / e.maxHealth * 100) + '%';
+                            player.attackTimer = 0; // Prevent multi-hits in one swing
+                            
+                            // Knockback
+                            e.x -= (dx/dist) * 2; e.z -= (dz/dist) * 2;
+                        }
+                    }
+                }
+
+                // Update Floating UI
+                let screenPos = e.mesh.position.clone();
+                screenPos.y += 2.5; // Above head
+                screenPos.project(camera); // Convert 3D to 2D
+
+                // Only show if in front of camera
+                if (screenPos.z < 1) {
+                    e.ui.style.display = 'block';
+                    e.ui.style.left = ((screenPos.x + 1) / 2 * window.innerWidth) + 'px';
+                    e.ui.style.top = (-(screenPos.y - 1) / 2 * window.innerHeight) + 'px';
+                } else {
+                    e.ui.style.display = 'none';
+                }
+
+                // Death
+                if (e.health <= 0) {
+                    scene.remove(e.mesh);
+                    floatingUI.removeChild(e.ui);
+                    enemies.splice(i, 1);
+                    player.kills++;
+                    killsEl.innerText = `Enemies Defeated: ${player.kills}`;
+                    
+                    // Small heal on kill
+                    player.health = Math.min(100, player.health + 10);
+                    healthBarEl.style.width = player.health + "%";
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        renderer.setAnimationLoop(update);
+
+        // Handle Resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
