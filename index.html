@@ -3,141 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>sword fight</title>
+    <title>dontlookdown</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
         canvas { display: block; }
 
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
         
-        #hud { padding: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
-        
-        #player-stats { background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; border: 2px solid #555; width: 300px; }
-        #health-bg { background: #333; width: 100%; height: 20px; border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
-        #health-bar { background: #10b981; width: 100%; height: 100%; transition: width 0.2s; }
-        #kills { color: #fbbf24; font-size: 1.5rem; font-weight: bold; margin-bottom: 5px; }
-        #status { color: #38bdf8; font-size: 1.1rem; font-weight: bold; height: 20px; }
+        #top-hud { padding: 20px 40px; display: flex; justify-content: space-between; background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent); }
+        .hud-text { font-size: 2rem; font-weight: bold; color: white; text-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        #altitude { color: #38bdf8; }
+        #high-score { color: #fbbf24; font-size: 1.2rem; margin-top: 5px; }
 
-        #controls-help { background: rgba(0,0,0,0.6); color: white; padding: 15px; border-radius: 8px; font-size: 0.9rem; line-height: 1.6; }
-        .key { background: #444; padding: 2px 6px; border-radius: 4px; border: 1px solid #777; font-weight: bold; }
+        #controls { text-align: center; color: rgba(255,255,255,0.8); padding-bottom: 20px; font-size: 1.1rem; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .key { display: inline-block; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px; border: 1px solid #555; margin: 0 2px; }
 
-        /* Floating Enemy Health Bars container */
-        #floating-ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
-        .enemy-health-bg { position: absolute; width: 50px; height: 8px; background: #333; border: 1px solid #000; border-radius: 4px; transform: translate(-50%, -50%); display: none; }
-        .enemy-health-fill { width: 100%; height: 100%; background: #ef4444; border-radius: 4px; transition: width 0.1s; }
-
-        #death-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(100, 0, 0, 0.8); display: none; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; }
-        #death-screen h1 { color: white; font-size: 5rem; margin-bottom: 10px; text-transform: uppercase; }
-        #final-score { color: #fbbf24; font-size: 2rem; margin-bottom: 30px; }
-        button { background: white; border: none; padding: 15px 30px; font-size: 1.5rem; font-weight: bold; cursor: pointer; border-radius: 8px; text-transform: uppercase; transition: 0.2s; }
-        button:hover { background: #fbbf24; transform: scale(1.05); }
+        #death-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9); display: none; flex-direction: column;
+            justify-content: center; align-items: center; pointer-events: auto; z-index: 10;
+        }
+        #death-screen h1 { font-size: 5rem; color: #ef4444; margin-bottom: 0; text-transform: uppercase; letter-spacing: 5px; }
+        #death-score { font-size: 2rem; color: white; margin: 20px 0 40px 0; }
+        button { background: #38bdf8; color: #0f172a; border: none; padding: 15px 40px; font-size: 1.5rem; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        button:hover { transform: scale(1.05); background: #7dd3fc; box-shadow: 0 0 20px #38bdf8; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
     <div id="ui-layer">
-        <div id="hud">
-            <div id="player-stats">
-                <div id="kills">Enemies Defeated: 0</div>
-                <div id="health-bg"><div id="health-bar"></div></div>
-                <div id="status">Ready</div>
+        <div id="top-hud">
+            <div>
+                <div class="hud-text" id="altitude">0m</div>
+                <div id="high-score">Best: 0m</div>
             </div>
-            <div id="controls-help">
-                Move: <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span><br>
-                Camera: <span class="key">Arrows</span><br>
-                Jump: <span class="key">Space</span><br>
-                Attack: <span class="key">Q</span><br>
-                Block: <span class="key">Hold E</span>
-            </div>
+        </div>
+        
+        <div id="controls">
+            Move: <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> &nbsp;|&nbsp; 
+            Camera: <span class="key">Arrows</span> &nbsp;|&nbsp; 
+            Jump: <span class="key">Space</span>
         </div>
     </div>
 
-    <div id="floating-ui"></div>
-
     <div id="death-screen">
-        <h1>YOU DIED</h1>
-        <div id="final-score">Enemies Defeated: 0</div>
-        <button onclick="location.reload()">Try Again</button>
+        <h1>YOU FELL</h1>
+        <div id="death-score">Final Altitude: 0m</div>
+        <button onclick="restartGame()">Try Again</button>
     </div>
 
     <script>
-        // --- 1. SCENE & CAMERA SETUP ---
+        // --- 1. SETUP THREE.JS ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue
-        scene.fog = new THREE.Fog(0x87CEEB, 20, 100); // Fog to hide world edges
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
 
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
         scene.add(ambientLight);
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(50, 100, 50);
+        dirLight.position.set(20, 50, 20);
         dirLight.castShadow = true;
-        dirLight.shadow.camera.left = -50; dirLight.shadow.camera.right = 50;
-        dirLight.shadow.camera.top = 50; dirLight.shadow.camera.bottom = -50;
         scene.add(dirLight);
 
-        // --- 2. WORLD GENERATION ---
-        // Ground
-        const groundGeo = new THREE.PlaneGeometry(300, 300);
-        const groundMat = new THREE.MeshPhongMaterial({ color: 0x2d5a27 }); // Dark green
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
+        // --- 2. GENERATE PROCEDURAL TEXTURES ---
+        function createCheckerboard() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const context = canvas.getContext('2d');
+            
+            // Base color
+            context.fillStyle = '#1e293b'; 
+            context.fillRect(0, 0, 256, 256);
+            
+            // Checker pattern
+            context.fillStyle = '#334155';
+            context.fillRect(0, 0, 128, 128);
+            context.fillRect(128, 128, 128, 128);
+            
+            // Outer glowing border for readability
+            context.strokeStyle = '#38bdf8';
+            context.lineWidth = 4;
+            context.strokeRect(2, 2, 252, 252);
 
-        // Generate Scenery (Trees, Hills, Buildings)
-        function createScenery() {
-            // Hills (Green Spheres half buried)
-            const hillMat = new THREE.MeshPhongMaterial({ color: 0x3a7833 });
-            for(let i=0; i<15; i++) {
-                let r = Math.random() * 10 + 5;
-                let hill = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), hillMat);
-                hill.position.set((Math.random()-0.5)*200, -r/2, (Math.random()-0.5)*200);
-                scene.add(hill);
-            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.NearestFilter; // Sharp pixels
+            return tex;
+        }
 
-            // Trees (Cylinder + Cone)
-            const trunkMat = new THREE.MeshPhongMaterial({ color: 0x5c4033 });
-            const leafMat = new THREE.MeshPhongMaterial({ color: 0x1e4d2b });
-            for(let i=0; i<60; i++) {
-                let treeGroup = new THREE.Group();
-                let trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 3), trunkMat);
-                trunk.position.y = 1.5; trunk.castShadow = true;
-                let leaves = new THREE.Mesh(new THREE.ConeGeometry(2.5, 5, 8), leafMat);
-                leaves.position.y = 4.5; leaves.castShadow = true;
-                treeGroup.add(trunk); treeGroup.add(leaves);
-                treeGroup.position.set((Math.random()-0.5)*200, 0, (Math.random()-0.5)*200);
-                scene.add(treeGroup);
-            }
+        const platformMaterial = new THREE.MeshStandardMaterial({ 
+            map: createCheckerboard(), 
+            roughness: 0.7, metalness: 0.2 
+        });
 
-            // Buildings (Boxes)
-            const stoneMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
-            for(let i=0; i<10; i++) {
-                let w = Math.random()*8 + 4; let h = Math.random()*15 + 5; let d = Math.random()*8 + 4;
-                let building = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stoneMat);
-                building.position.set((Math.random()-0.5)*200, h/2, (Math.random()-0.5)*200);
-                building.castShadow = true; building.receiveShadow = true;
-                scene.add(building);
+        // --- 3. PLATFORM GENERATOR ---
+        let platforms = [];
+        let highestPlatformY = 0;
+        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+        function createPlatform(x, y, z, width, depth) {
+            const mesh = new THREE.Mesh(boxGeo, platformMaterial);
+            mesh.scale.set(width, 1, depth);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            
+            // Fix texture tiling based on scale
+            const clonedMat = platformMaterial.clone();
+            clonedMat.map = platformMaterial.map.clone();
+            clonedMat.map.repeat.set(width / 4, depth / 4);
+            clonedMat.map.wrapS = THREE.RepeatWrapping;
+            clonedMat.map.wrapT = THREE.RepeatWrapping;
+            mesh.material = clonedMat;
+
+            scene.add(mesh);
+            platforms.push({ mesh, x, y, z, w: width, d: depth });
+            if (y > highestPlatformY) highestPlatformY = y;
+        }
+
+        function generateInitialWorld() {
+            platforms.forEach(p => scene.remove(p.mesh));
+            platforms = [];
+            highestPlatformY = 0;
+
+            // Ground Zero
+            createPlatform(0, -1, 0, 15, 15);
+
+            // Generate first batch
+            let px = 0; let py = 2; let pz = 0;
+            for(let i=0; i<20; i++) {
+                // Jump math (max jump is roughly 4 units high, 8 units across)
+                px += (Math.random() - 0.5) * 12;
+                py += Math.random() * 2 + 1; // Always goes up
+                pz += (Math.random() - 0.5) * 12;
+                
+                let size = Math.random() * 4 + 3; // Width 3 to 7
+                createPlatform(px, py, pz, size, size);
             }
         }
-        createScenery();
 
-        // --- 3. INPUT HANDLING ---
-        const keys = { w: false, a: false, s: false, d: false, space: false, q: false, e: false, up: false, down: false, left: false, right: false };
+        // --- 4. PLAYER & PHYSICS ---
+        const player = {
+            x: 0, y: 5, z: 0, 
+            vx: 0, vy: 0, vz: 0,
+            yaw: 0, pitch: 0.3, 
+            onGround: false, isDead: false, maxAltitude: 0
+        };
+
+        const pMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: 0xfbbf24, roughness: 0.2, metalness: 0.8}));
+        pMesh.castShadow = true;
+        scene.add(pMesh);
+
+        // --- 5. INPUT HANDLING ---
+        const keys = { w: false, a: false, s: false, d: false, space: false, up: false, down: false, left: false, right: false };
         
         window.addEventListener('keydown', (e) => {
+            if (player.isDead) return;
             const k = e.key.toLowerCase();
             if (k === 'w') keys.w = true; if (k === 'a') keys.a = true;
             if (k === 's') keys.s = true; if (k === 'd') keys.d = true;
+            
+            // PreventDefault stops browser scrolling while jumping/moving camera!
             if (k === ' ') { keys.space = true; e.preventDefault(); }
-            if (k === 'q') keys.q = true; if (k === 'e') keys.e = true;
             if (e.key === 'ArrowUp') { keys.up = true; e.preventDefault(); }
             if (e.key === 'ArrowDown') { keys.down = true; e.preventDefault(); }
             if (e.key === 'ArrowLeft') { keys.left = true; e.preventDefault(); }
@@ -149,278 +180,151 @@
             if (k === 'w') keys.w = false; if (k === 'a') keys.a = false;
             if (k === 's') keys.s = false; if (k === 'd') keys.d = false;
             if (k === ' ') keys.space = false;
-            if (k === 'q') keys.q = false; if (k === 'e') keys.e = false;
             if (e.key === 'ArrowUp') keys.up = false;
             if (e.key === 'ArrowDown') keys.down = false;
             if (e.key === 'ArrowLeft') keys.left = false;
             if (e.key === 'ArrowRight') keys.right = false;
         });
 
-        // --- 4. PLAYER CHARACTER ---
-        const player = {
-            x: 0, y: 0, z: 0, vy: 0, health: 100, kills: 0, isDead: false,
-            yaw: 0, // Camera horizontal rotation
-            pitch: 0.3, // Camera vertical rotation
-            isAttacking: false, attackTimer: 0, isBlocking: false
-        };
-
-        const pGroup = new THREE.Group();
-        const pBody = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({ color: 0x38bdf8 }));
-        pBody.position.y = 1; pBody.castShadow = true;
-        pGroup.add(pBody);
-
-        // Sword
-        const swordGroup = new THREE.Group();
-        swordGroup.position.set(0.6, 1, -0.2); // Attached to right side
-        const swordHilt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4), new THREE.MeshPhongMaterial({color: 0x444444}));
-        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.5, 0.2), new THREE.MeshPhongMaterial({color: 0xcccccc}));
-        swordBlade.position.y = 0.9;
-        swordGroup.add(swordHilt); swordGroup.add(swordBlade);
-        swordGroup.rotation.x = Math.PI / 4; // Rest position
-        pGroup.add(swordGroup);
-        scene.add(pGroup);
-
-        // --- 5. ENEMY SYSTEM ---
-        let enemies = [];
-        const floatingUI = document.getElementById('floating-ui');
-
-        function spawnEnemy() {
-            if(enemies.length > 15) return; // Cap at 15
-            let ex = player.x + (Math.random() - 0.5) * 60;
-            let ez = player.z + (Math.random() - 0.5) * 60;
-            
-            // Don't spawn too close
-            if (Math.abs(ex - player.x) < 15 && Math.abs(ez - player.z) < 15) return;
-
-            let eGroup = new THREE.Group();
-            let eBody = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({ color: 0xef4444 }));
-            eBody.position.y = 1; eBody.castShadow = true;
-            eGroup.add(eBody);
-            
-            // Enemy Sword
-            let eSword = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.2, 0.2), new THREE.MeshPhongMaterial({color: 0x999999}));
-            eSword.position.set(0.6, 1.5, -0.5);
-            eSword.rotation.x = Math.PI / 2; // Pointing forward
-            eGroup.add(eSword);
-            
-            eGroup.position.set(ex, 0, ez);
-            scene.add(eGroup);
-
-            // Create HTML Health Bar
-            let hpContainer = document.createElement('div');
-            hpContainer.className = 'enemy-health-bg';
-            let hpFill = document.createElement('div');
-            hpFill.className = 'enemy-health-fill';
-            hpContainer.appendChild(hpFill);
-            floatingUI.appendChild(hpContainer);
-
-            enemies.push({
-                mesh: eGroup, health: 50, maxHealth: 50, x: ex, z: ez, 
-                ui: hpContainer, uiFill: hpFill, attackCooldown: 0
-            });
-        }
-
-        setInterval(spawnEnemy, 2000); // Try spawning every 2s
-
-        // --- 6. GAME LOGIC & PHYSICS ---
+        // --- 6. MAIN GAME LOOP ---
         const clock = new THREE.Clock();
-        const statusEl = document.getElementById('status');
-        const healthBarEl = document.getElementById('health-bar');
-        const killsEl = document.getElementById('kills');
-
-        function takeDamage(amount) {
-            if (player.isBlocking) {
-                amount = Math.floor(amount * 0.2); // 80% damage reduction
-                statusEl.innerText = "Blocked!";
-                statusEl.style.color = "#fbbf24";
-            } else {
-                statusEl.innerText = "Hit!";
-                statusEl.style.color = "#ef4444";
-            }
-            player.health -= amount;
-            if (player.health < 0) player.health = 0;
-            healthBarEl.style.width = player.health + "%";
-
-            if (player.health === 0 && !player.isDead) {
-                player.isDead = true;
-                document.getElementById('death-screen').style.display = 'flex';
-                document.getElementById('final-score').innerText = `Enemies Defeated: ${player.kills}`;
-            }
-            setTimeout(() => { if(!player.isBlocking && !player.isDead) statusEl.innerText = "Ready"; }, 1000);
-        }
+        let bestAltitude = 0;
 
         function update() {
             if (player.isDead) return;
             const dt = Math.min(clock.getDelta(), 0.1);
 
-            // -- Camera Controls (Arrows) --
+            // -- Camera Orientation --
             if (keys.left) player.yaw += 2 * dt;
             if (keys.right) player.yaw -= 2 * dt;
             if (keys.up) player.pitch -= 1.5 * dt;
             if (keys.down) player.pitch += 1.5 * dt;
-            // Clamp pitch to avoid flipping
             player.pitch = Math.max(0.1, Math.min(Math.PI / 2.2, player.pitch));
 
-            // -- Player Movement (WASD relative to Camera Yaw) --
-            let speed = 10;
+            // -- WASD Movement (Relative to Camera) --
+            let speed = 12; // Base movement speed
             let moveX = 0; let moveZ = 0;
             
-            if (keys.w) { moveZ -= 1; }
-            if (keys.s) { moveZ += 1; }
-            if (keys.a) { moveX -= 1; }
-            if (keys.d) { moveX += 1; }
+            if (keys.w) moveZ -= 1;
+            if (keys.s) moveZ += 1;
+            if (keys.a) moveX -= 1;
+            if (keys.d) moveX += 1;
 
             if (moveX !== 0 || moveZ !== 0) {
-                // Normalize for diagonal movement
                 let length = Math.sqrt(moveX*moveX + moveZ*moveZ);
                 moveX /= length; moveZ /= length;
                 
-                // Rotate movement vector by camera yaw
                 let c = Math.cos(player.yaw); let s = Math.sin(player.yaw);
                 let worldX = moveX * c - moveZ * s;
                 let worldZ = moveX * s + moveZ * c;
 
-                player.x += worldX * speed * dt;
-                player.z += worldZ * speed * dt;
-
-                // Face the direction of movement
-                pGroup.rotation.y = Math.atan2(worldX, worldZ);
-            }
-
-            // Boundary limits
-            player.x = Math.max(-145, Math.min(145, player.x));
-            player.z = Math.max(-145, Math.min(145, player.z));
-
-            // Gravity & Jump
-            player.vy -= 25 * dt; // Gravity
-            player.y += player.vy * dt;
-            if (player.y < 0) { player.y = 0; player.vy = 0; }
-            if (keys.space && player.y === 0) { player.vy = 12; }
-
-            pGroup.position.set(player.x, player.y, player.z);
-
-            // -- Combat System --
-            player.isBlocking = keys.e && !player.isAttacking;
-            
-            if (player.isBlocking) {
-                swordGroup.rotation.x = Math.PI / 2; // Hold horizontal across body
-                swordGroup.rotation.z = Math.PI / 2;
-                swordGroup.position.set(0, 1.5, -0.6);
-                statusEl.innerText = "Blocking"; statusEl.style.color = "#fbbf24";
+                // Apply velocity with some momentum
+                player.vx = worldX * speed;
+                player.vz = worldZ * speed;
             } else {
-                swordGroup.position.set(0.6, 1, -0.2);
-                swordGroup.rotation.z = 0;
-                
-                if (keys.q && !player.isAttacking) {
-                    player.isAttacking = true;
-                    player.attackTimer = 0.3; // 0.3 seconds swing
-                    statusEl.innerText = "Swinging!"; statusEl.style.color = "#38bdf8";
-                }
-
-                if (player.isAttacking) {
-                    player.attackTimer -= dt;
-                    // Animate sword swing downward
-                    let swingAnim = player.attackTimer / 0.3; // 1 to 0
-                    swordGroup.rotation.x = (swingAnim * Math.PI) - (Math.PI / 2); // Swing from high to low
-
-                    if (player.attackTimer <= 0) {
-                        player.isAttacking = false;
-                        statusEl.innerText = "Ready";
-                    }
-                } else {
-                    swordGroup.rotation.x = Math.PI / 4; // Rest
-                }
+                // Friction when keys released
+                player.vx *= 0.8; 
+                player.vz *= 0.8;
             }
 
-            // -- Camera Positioning --
-            // Calculate offset based on yaw and pitch
-            let camDist = 12;
-            let cx = player.x + camDist * Math.sin(player.yaw) * Math.cos(player.pitch);
-            let cy = player.y + 2 + camDist * Math.sin(player.pitch); // +2 to look at head height
-            let cz = player.z + camDist * Math.cos(player.yaw) * Math.cos(player.pitch);
-            
-            camera.position.set(cx, cy, cz);
-            camera.lookAt(player.x, player.y + 2, player.z);
+            // -- Physics & Collision --
+            player.vy -= 30 * dt; // Gravity
+            let nextY = player.y + player.vy * dt;
+            let landed = false;
 
-            // -- Enemies Logic --
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                let e = enemies[i];
-                let dx = player.x - e.x;
-                let dz = player.z - e.z;
-                let dist = Math.sqrt(dx*dx + dz*dz);
+            // Check platform collisions (only when falling)
+            if (player.vy < 0) {
+                for (let p of platforms) {
+                    // Check if player's feet (y - 1) cross the top of the platform (p.y + 0.5)
+                    let pTop = p.y + 0.5;
+                    let pLeft = p.x - p.w/2 - 0.5; let pRight = p.x + p.w/2 + 0.5;
+                    let pBack = p.z - p.d/2 - 0.5; let pFront = p.z + p.d/2 + 0.5;
 
-                // Face Player
-                e.mesh.rotation.y = Math.atan2(dx, dz);
-
-                // Move towards player
-                if (dist > 2) {
-                    e.x += (dx/dist) * 3 * dt; // Speed 3
-                    e.z += (dz/dist) * 3 * dt;
-                } else {
-                    // Attack Player
-                    e.attackCooldown -= dt;
-                    if (e.attackCooldown <= 0) {
-                        takeDamage(10);
-                        e.attackCooldown = 1.5; // Attack every 1.5s
-                        
-                        // Simple poke animation
-                        e.mesh.children[1].position.z = -1;
-                        setTimeout(() => { if(e.mesh.children[1]) e.mesh.children[1].position.z = -0.5; }, 200);
-                    }
-                }
-                e.mesh.position.set(e.x, 0, e.z);
-
-                // Player Hit Detection
-                if (player.isAttacking && player.attackTimer > 0.1 && player.attackTimer < 0.2) {
-                    // If enemy is close AND in front of player
-                    if (dist < 3.5) {
-                        // Calculate angle difference between player facing and enemy position
-                        let angleToEnemy = Math.atan2(dx, dz);
-                        let angleDiff = Math.abs(pGroup.rotation.y - angleToEnemy);
-                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-                        
-                        if (angleDiff < Math.PI / 3) { // 60 degree cone
-                            e.health -= 20;
-                            e.uiFill.style.width = (e.health / e.maxHealth * 100) + '%';
-                            player.attackTimer = 0; // Prevent multi-hits in one swing
-                            
-                            // Knockback
-                            e.x -= (dx/dist) * 2; e.z -= (dz/dist) * 2;
+                    if (player.y - 1 >= pTop - 0.2 && nextY - 1 <= pTop) {
+                        if (player.x > pLeft && player.x < pRight && player.z > pBack && player.z < pFront) {
+                            nextY = pTop + 1; // Snap to top
+                            player.vy = 0;
+                            landed = true;
+                            break;
                         }
                     }
                 }
+            }
 
-                // Update Floating UI
-                let screenPos = e.mesh.position.clone();
-                screenPos.y += 2.5; // Above head
-                screenPos.project(camera); // Convert 3D to 2D
+            player.onGround = landed;
+            if (player.onGround && keys.space) {
+                player.vy = 16; // Jump Power
+                player.onGround = false;
+            }
 
-                // Only show if in front of camera
-                if (screenPos.z < 1) {
-                    e.ui.style.display = 'block';
-                    e.ui.style.left = ((screenPos.x + 1) / 2 * window.innerWidth) + 'px';
-                    e.ui.style.top = (-(screenPos.y - 1) / 2 * window.innerHeight) + 'px';
-                } else {
-                    e.ui.style.display = 'none';
+            player.x += player.vx * dt;
+            player.y = nextY;
+            player.z += player.vz * dt;
+            pMesh.position.set(player.x, player.y, player.z);
+
+            // -- Dynamic Sky & Fog Colors --
+            // As you go higher, sky turns from blue to dark space purple
+            let heightFactor = Math.min(player.y / 200, 1);
+            let skyColor = new THREE.Color().lerpColors(new THREE.Color(0x87CEEB), new THREE.Color(0x0f0524), heightFactor);
+            scene.background = skyColor;
+            scene.fog.color = skyColor;
+
+            // -- Camera Positioning --
+            let camDist = 8;
+            let cx = player.x + camDist * Math.sin(player.yaw) * Math.cos(player.pitch);
+            let cy = player.y + 1 + camDist * Math.sin(player.pitch);
+            let cz = player.z + camDist * Math.cos(player.yaw) * Math.cos(player.pitch);
+            
+            camera.position.set(cx, cy, cz);
+            camera.lookAt(player.x, player.y + 1, player.z);
+
+            // -- Infinite Generation & Cleanup --
+            // Generate new platforms ahead
+            if (highestPlatformY - player.y < 30) {
+                let lastP = platforms[platforms.length - 1];
+                let nx = lastP.x + (Math.random() - 0.5) * 12;
+                let ny = lastP.y + Math.random() * 2.5 + 1;
+                let nz = lastP.z + (Math.random() - 0.5) * 12;
+                let size = Math.random() * 4 + 3;
+                createPlatform(nx, ny, nz, size, size);
+            }
+
+            // Remove platforms too far below to save memory
+            for (let i = platforms.length - 1; i >= 0; i--) {
+                if (platforms[i].y < player.y - 40) {
+                    scene.remove(platforms[i].mesh);
+                    platforms.splice(i, 1);
                 }
+            }
 
-                // Death
-                if (e.health <= 0) {
-                    scene.remove(e.mesh);
-                    floatingUI.removeChild(e.ui);
-                    enemies.splice(i, 1);
-                    player.kills++;
-                    killsEl.innerText = `Enemies Defeated: ${player.kills}`;
-                    
-                    // Small heal on kill
-                    player.health = Math.min(100, player.health + 10);
-                    healthBarEl.style.width = player.health + "%";
-                }
+            // -- UI Updates --
+            let currentAlt = Math.max(0, Math.floor(player.y));
+            if (currentAlt > player.maxAltitude) player.maxAltitude = currentAlt;
+            document.getElementById('altitude').innerText = currentAlt + "m";
+            
+            // -- Death Condition --
+            // If you fall 15 meters below your highest achieved altitude
+            if (player.y < player.maxAltitude - 15 || player.y < -5) {
+                player.isDead = true;
+                if (player.maxAltitude > bestAltitude) bestAltitude = player.maxAltitude;
+                document.getElementById('death-score').innerText = `Final Altitude: ${player.maxAltitude}m`;
+                document.getElementById('high-score').innerText = `Best: ${bestAltitude}m`;
+                document.getElementById('death-screen').style.display = 'flex';
             }
 
             renderer.render(scene, camera);
         }
 
+        function restartGame() {
+            document.getElementById('death-screen').style.display = 'none';
+            player.isDead = false;
+            player.x = 0; player.y = 5; player.z = 0;
+            player.vx = 0; player.vy = 0; player.vz = 0;
+            player.maxAltitude = 0;
+            generateInitialWorld();
+        }
+
+        generateInitialWorld();
         renderer.setAnimationLoop(update);
 
         // Handle Resizing
