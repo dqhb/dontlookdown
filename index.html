@@ -77,22 +77,19 @@
             canvas.width = 256; canvas.height = 256;
             const context = canvas.getContext('2d');
             
-            // Base color
             context.fillStyle = '#1e293b'; 
             context.fillRect(0, 0, 256, 256);
             
-            // Checker pattern
             context.fillStyle = '#334155';
             context.fillRect(0, 0, 128, 128);
             context.fillRect(128, 128, 128, 128);
             
-            // Outer glowing border for readability
             context.strokeStyle = '#38bdf8';
             context.lineWidth = 4;
             context.strokeRect(2, 2, 252, 252);
 
             const tex = new THREE.CanvasTexture(canvas);
-            tex.magFilter = THREE.NearestFilter; // Sharp pixels
+            tex.magFilter = THREE.NearestFilter;
             return tex;
         }
 
@@ -112,7 +109,6 @@
             mesh.position.set(x, y, z);
             mesh.castShadow = true; mesh.receiveShadow = true;
             
-            // Fix texture tiling based on scale
             const clonedMat = platformMaterial.clone();
             clonedMat.map = platformMaterial.map.clone();
             clonedMat.map.repeat.set(width / 4, depth / 4);
@@ -130,18 +126,14 @@
             platforms = [];
             highestPlatformY = 0;
 
-            // Ground Zero
             createPlatform(0, -1, 0, 15, 15);
 
-            // Generate first batch
             let px = 0; let py = 2; let pz = 0;
             for(let i=0; i<20; i++) {
-                // Jump math (max jump is roughly 4 units high, 8 units across)
                 px += (Math.random() - 0.5) * 12;
-                py += Math.random() * 2 + 1; // Always goes up
+                py += Math.random() * 2 + 1;
                 pz += (Math.random() - 0.5) * 12;
-                
-                let size = Math.random() * 4 + 3; // Width 3 to 7
+                let size = Math.random() * 4 + 3;
                 createPlatform(px, py, pz, size, size);
             }
         }
@@ -154,7 +146,6 @@
             onGround: false, isDead: false, maxAltitude: 0
         };
 
-        // FIXED: Changed CapsuleGeometry to CylinderGeometry for r128 compatibility
         const pMesh = new THREE.Mesh(
             new THREE.CylinderGeometry(0.5, 0.5, 2, 16), 
             new THREE.MeshStandardMaterial({color: 0xfbbf24, roughness: 0.2, metalness: 0.8})
@@ -171,7 +162,6 @@
             if (k === 'w') keys.w = true; if (k === 'a') keys.a = true;
             if (k === 's') keys.s = true; if (k === 'd') keys.d = true;
             
-            // PreventDefault stops browser scrolling while jumping/moving camera!
             if (k === ' ') { keys.space = true; e.preventDefault(); }
             if (e.key === 'ArrowUp') { keys.up = true; e.preventDefault(); }
             if (e.key === 'ArrowDown') { keys.down = true; e.preventDefault(); }
@@ -198,15 +188,13 @@
             if (player.isDead) return;
             const dt = Math.min(clock.getDelta(), 0.1);
 
-            // -- Camera Orientation --
             if (keys.left) player.yaw += 2 * dt;
             if (keys.right) player.yaw -= 2 * dt;
             if (keys.up) player.pitch -= 1.5 * dt;
             if (keys.down) player.pitch += 1.5 * dt;
             player.pitch = Math.max(0.1, Math.min(Math.PI / 2.2, player.pitch));
 
-            // -- WASD Movement (Relative to Camera) --
-            let speed = 12; // Base movement speed
+            let speed = 12;
             let moveX = 0; let moveZ = 0;
             
             if (keys.w) moveZ -= 1;
@@ -222,31 +210,26 @@
                 let worldX = moveX * c - moveZ * s;
                 let worldZ = moveX * s + moveZ * c;
 
-                // Apply velocity with some momentum
                 player.vx = worldX * speed;
                 player.vz = worldZ * speed;
             } else {
-                // Friction when keys released
                 player.vx *= 0.8; 
                 player.vz *= 0.8;
             }
 
-            // -- Physics & Collision --
-            player.vy -= 30 * dt; // Gravity
+            player.vy -= 30 * dt;
             let nextY = player.y + player.vy * dt;
             let landed = false;
 
-            // Check platform collisions (only when falling)
             if (player.vy < 0) {
                 for (let p of platforms) {
-                    // Check if player's feet (y - 1) cross the top of the platform (p.y + 0.5)
                     let pTop = p.y + 0.5;
                     let pLeft = p.x - p.w/2 - 0.5; let pRight = p.x + p.w/2 + 0.5;
                     let pBack = p.z - p.d/2 - 0.5; let pFront = p.z + p.d/2 + 0.5;
 
                     if (player.y - 1 >= pTop - 0.2 && nextY - 1 <= pTop) {
                         if (player.x > pLeft && player.x < pRight && player.z > pBack && player.z < pFront) {
-                            nextY = pTop + 1; // Snap to top
+                            nextY = pTop + 1;
                             player.vy = 0;
                             landed = true;
                             break;
@@ -257,7 +240,7 @@
 
             player.onGround = landed;
             if (player.onGround && keys.space) {
-                player.vy = 16; // Jump Power
+                player.vy = 16;
                 player.onGround = false;
             }
 
@@ -266,24 +249,20 @@
             player.z += player.vz * dt;
             pMesh.position.set(player.x, player.y, player.z);
 
-            // -- Dynamic Sky & Fog Colors --
-            // FIXED: Math.max added to prevent negative values when falling below 0
             let heightFactor = Math.max(0, Math.min(player.y / 200, 1));
             let skyColor = new THREE.Color().lerpColors(new THREE.Color(0x87CEEB), new THREE.Color(0x0f0524), heightFactor);
             scene.background = skyColor;
             scene.fog.color = skyColor;
 
-            // -- Camera Positioning --
+            // FIXED CAMERA MATH HERE
             let camDist = 8;
             let cx = player.x + camDist * Math.sin(player.yaw) * Math.cos(player.pitch);
-            let cy = player.y + 1 + cam Math.sin(player.pitch);
+            let cy = player.y + 1 + camDist * Math.sin(player.pitch);
             let cz = player.z + camDist * Math.cos(player.yaw) * Math.cos(player.pitch);
             
             camera.position.set(cx, cy, cz);
             camera.lookAt(player.x, player.y + 1, player.z);
 
-            // -- Infinite Generation & Cleanup --
-            // Generate new platforms ahead
             if (highestPlatformY - player.y < 30) {
                 let lastP = platforms[platforms.length - 1];
                 let nx = lastP.x + (Math.random() - 0.5) * 12;
@@ -293,7 +272,6 @@
                 createPlatform(nx, ny, nz, size, size);
             }
 
-            // Remove platforms too far below to save memory
             for (let i = platforms.length - 1; i >= 0; i--) {
                 if (platforms[i].y < player.y - 40) {
                     scene.remove(platforms[i].mesh);
@@ -301,13 +279,10 @@
                 }
             }
 
-            // -- UI Updates --
             let currentAlt = Math.max(0, Math.floor(player.y));
             if (currentAlt > player.maxAltitude) player.maxAltitude = currentAlt;
             document.getElementById('altitude').innerText = currentAlt + "m";
             
-            // -- Death Condition --
-            // If you fall 15 meters below your highest achieved altitude
             if (player.y < player.maxAltitude - 15 || player.y < -5) {
                 player.isDead = true;
                 if (player.maxAltitude > bestAltitude) bestAltitude = player.maxAltitude;
@@ -331,7 +306,6 @@
         generateInitialWorld();
         renderer.setAnimationLoop(update);
 
-        // Handle Resizing
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
