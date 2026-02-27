@@ -4,44 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parkour Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body {
-            margin: 0; 
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-        }
+        body { margin: 0; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        // Setup scene, camera, and renderer
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+<script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-        // Create moving platforms
-        const platformGeometry = new THREE.BoxGeometry(2, 0.2, 2);
-        const platformMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-        scene.add(platform);
-        platform.position.y = 0;
+    const geometry = new THREE.BoxGeometry();
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const platform = new THREE.Mesh(geometry, material);
+    scene.add(platform);
 
-        // Animate moving platforms
-        function animate() {
-            requestAnimationFrame(animate);
-            platform.position.x += 0.01;
-            if (platform.position.x > 5) platform.position.x = -5;
-            renderer.render(scene, camera);
+    camera.position.z = 5;
+
+    const keys = { 
+        w: false, 
+        a: false, 
+        s: false, 
+        d: false, 
+        arrowUp: false, 
+        arrowDown: false,
+        arrowLeft: false,
+        arrowRight: false 
+    };
+
+    document.addEventListener('keydown', (event) => {
+        switch(event.key) {
+            case 'w': keys.w = true; break;
+            case 'a': keys.a = true; break;
+            case 's': keys.s = true; break;
+            case 'd': keys.d = true; break;
+            case 'ArrowUp': keys.arrowUp = true; break;
+            case 'ArrowDown': keys.arrowDown = true; break;
+            case 'ArrowLeft': keys.arrowLeft = true; break;
+            case 'ArrowRight': keys.arrowRight = true; break;
         }
-        animate();
+    });
 
-        camera.position.z = 5;
-        // Add functionality for better platform spacing and improved gameplay here
-    </script>
+    document.addEventListener('keyup', (event) => {
+        switch(event.key) {
+            case 'w': keys.w = false; break;
+            case 'a': keys.a = false; break;
+            case 's': keys.s = false; break;
+            case 'd': keys.d = false; break;
+            case 'ArrowUp': keys.arrowUp = false; break;
+            case 'ArrowDown': keys.arrowDown = false; break;
+            case 'ArrowLeft': keys.arrowLeft = false; break;
+            case 'ArrowRight': keys.arrowRight = false; break;
+        }
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        if (keys.w) camera.position.z -= 0.1;
+        if (keys.s) camera.position.z += 0.1;
+        if (keys.a) camera.position.x -= 0.1;
+        if (keys.d) camera.position.x += 0.1;
+
+        if (keys.arrowUp) camera.rotation.x -= 0.01;
+        if (keys.arrowDown) camera.rotation.x += 0.01;
+        if (keys.arrowLeft) camera.rotation.y -= 0.01;
+        if (keys.arrowRight) camera.rotation.y += 0.01;
+
+        renderer.render(scene, camera);
+    }
+    animate();
+</script>
 </body>
 </html>
